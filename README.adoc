@@ -1,6 +1,6 @@
 === Hi there 👋
 
-image::/github-metrics.svg[title="LimitlessGreen Metrics", link="#"]
+image::/github-metrics.svg[link="#"]
 
 
 ////
