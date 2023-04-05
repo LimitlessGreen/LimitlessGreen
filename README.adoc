@@ -1,5 +1,8 @@
 === Hi there 👋
 
+image::/github-metrics.svg[title="LimitlessGreen Metrics", link="#"]
+
+
 ////
 LimitlessGreen/LimitlessGreen is a special repository because its README.md (this file) appears on your GitHub profile.
 
