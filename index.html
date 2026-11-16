@@ -12,11 +12,11 @@
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      margin: 0; min-height: 100vh; display: grid; justify-items: center;
       background: var(--bg); color: var(--fg);
       font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
     }
-    main { width: min(1280px, 100% - 32px); }
+    main { width: min(1280px, 100% - 32px); padding-top: 32px; }
     #banner svg { display: block; width: 100%; height: auto; }
     .bar { display: flex; align-items: center; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
     button {
@@ -29,9 +29,14 @@
     .time { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); min-width: 9ch; }
     p { color: var(--muted); margin: 0; flex: 1 1 320px; }
     a { color: var(--accent); }
-    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; margin: 28px 0 0; color: var(--muted); font-size: 14px; }
-    dt { color: var(--fg); font-weight: 600; }
-    dd { margin: 0; }
+    .math { margin: 48px 0 64px; }
+    .math h2 { font-size: 20px; margin: 0 0 8px; }
+    .math article { padding: 20px 0; border-top: 1px solid color-mix(in srgb, var(--muted) 25%, transparent); }
+    .math h3 { font-size: 16px; margin: 0 0 12px; }
+    .math h3 span { font-weight: 400; color: var(--muted); margin-left: 8px; font-size: 14px; }
+    .math math { font-size: 20px; margin: 8px 0 12px; overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .math p { font-size: 14px; }
+    .math .src { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -48,15 +53,59 @@
        <a href="https://github.com/LimitlessGreen">← back to GitHub</a></p>
   </div>
 
-  <dl>
-    <dt>Birds</dt><dd>Synthetic syllables with pitch jitter, a few dozen distant calls and a short forest reverb.</dd>
-    <dt>Sweep</dt><dd>Exponential sine sweep (Farina), the classic excitation for measuring room impulse responses.</dd>
-    <dt>FM</dt><dd>Chowning FM synthesis; the sidebands at f<sub>c</sub> ± n·f<sub>m</sub> follow Bessel functions J<sub>n</sub>(β).</dd>
-    <dt>Σ</dt><dd>Fourier series of a band-limited sawtooth with glide and vibrato.</dd>
-    <dt>sinc</dt><dd>A tone tracing sin(πx)/(πx), the impulse response of the ideal low-pass.</dd>
-    <dt>Text</dt><dd>One sine per third FFT bin, its loudness following the rendered letters.
-      Source: <a href="https://github.com/LimitlessGreen/LimitlessGreen/blob/main/scripts/make_banner.py">make_banner.py</a></dd>
-  </dl>
+  <section class="math" aria-label="What you are hearing">
+    <h2>What you are hearing</h2>
+
+    <article>
+      <h3>Exponential sine sweep <span>Farina · room impulse response measurement</span></h3>
+      <math display="block"><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mi>sin</mi><mrow><mo>[</mo><mn>2</mn><mi>π</mi><msub><mi>f</mi><mn>1</mn></msub><mi>L</mi><mrow><mo>(</mo><msup><mi>e</mi><mrow><mi>t</mi><mo>/</mo><mi>L</mi></mrow></msup><mo>−</mo><mn>1</mn><mo>)</mo></mrow><mo>]</mo></mrow><mo>,</mo><mspace width="1em"/><mi>L</mi><mo>=</mo><mfrac><mi>T</mi><mrow><mi>ln</mi><mo>(</mo><msub><mi>f</mi><mn>2</mn></msub><mo>/</mo><msub><mi>f</mi><mn>1</mn></msub><mo>)</mo></mrow></mfrac><mo>,</mo><mspace width="1em"/><msub><mi>f</mi><mi>inst</mi></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>f</mi><mn>1</mn></msub><msup><mi>e</mi><mrow><mi>t</mi><mo>/</mo><mi>L</mi></mrow></msup></math>
+      <p>f<sub>1</sub> = 600 Hz, f<sub>2</sub> = 4.4 kHz, T = 0.85 s. Equal time per octave — which is why it bends upward on a linear frequency axis.</p>
+    </article>
+
+    <article>
+      <h3>FM synthesis <span>Chowning</span></h3>
+      <math display="block"><mi>y</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mi>sin</mi><mrow><mo>(</mo><msub><mi>ω</mi><mi>c</mi></msub><mi>t</mi><mo>+</mo><mi>β</mi><mo>(</mo><mi>t</mi><mo>)</mo><mspace width="0.2em"/><mi>sin</mi><mspace width="0.2em"/><msub><mi>ω</mi><mi>m</mi></msub><mi>t</mi><mo>)</mo></mrow><mo>=</mo><munderover><mo>∑</mo><mrow><mi>n</mi><mo>=</mo><mo>−</mo><mi>∞</mi></mrow><mi>∞</mi></munderover><msub><mi>J</mi><mi>n</mi></msub><mo>(</mo><mi>β</mi><mo>)</mo><mi>sin</mi><mrow><mo>(</mo><mo>(</mo><msub><mi>ω</mi><mi>c</mi></msub><mo>+</mo><mi>n</mi><msub><mi>ω</mi><mi>m</mi></msub><mo>)</mo><mi>t</mi><mo>)</mo></mrow></math>
+      <p>f<sub>c</sub> = 2.9 kHz, f<sub>m</sub> = 190 Hz, β(t) = 5.5 sin²(πt/T), T = 0.95 s. Sidebands every f<sub>m</sub>; the dark gaps inside the diamond are zeros of the Bessel functions J<sub>n</sub>(β).</p>
+    </article>
+
+    <article>
+      <h3>Fourier series <span>band-limited sawtooth</span></h3>
+      <math display="block"><mi>s</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>n</mi><mo>=</mo><mn>2</mn></mrow><mn>12</mn></munderover><mfrac><mrow><mi>sin</mi><mo>(</mo><mi>n</mi><mi>φ</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo></mrow><mi>n</mi></mfrac><mo>,</mo><mspace width="1em"/><mi>φ</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mn>2</mn><mi>π</mi><msubsup><mo>∫</mo><mn>0</mn><mi>t</mi></msubsup><msub><mi>f</mi><mn>0</mn></msub><mo>(</mo><mi>τ</mi><mo>)</mo><mi>d</mi><mi>τ</mi><mo>,</mo><mspace width="1em"/><mi>n</mi><msub><mi>f</mi><mn>0</mn></msub><mo>&lt;</mo><mn>4.6</mn><mtext>&#x2009;kHz</mtext></math>
+      <p>f<sub>0</sub>(t) = 380 Hz + 160 Hz·t/T + 14 Hz·sin(2π·5.5 Hz·t)·t/T — a glide with growing vibrato. The fundamental is left out so the stack stays clear of the labels.</p>
+    </article>
+
+    <article>
+      <h3>sinc <span>impulse response of the ideal low-pass</span></h3>
+      <math display="block"><mi>sinc</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mfrac><mrow><mi>sin</mi><mo>(</mo><mi>π</mi><mi>x</mi><mo>)</mo></mrow><mrow><mi>π</mi><mi>x</mi></mrow></mfrac><mo>,</mo><mspace width="1em"/><msub><mi>f</mi><mi>inst</mi></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mn>1.9</mn><mtext>&#x2009;kHz</mtext><mo>+</mo><mn>2.5</mn><mtext>&#x2009;kHz</mtext><mo>·</mo><mi>sinc</mi><mo>(</mo><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>)</mo><mo>,</mo><mspace width="1em"/><mi>x</mi><mo>∈</mo><mo>[</mo><mo>−</mo><mn>6.5</mn><mo>,</mo><mn>6.5</mn><mo>]</mo></math>
+      <p>A tone whose frequency traces the sinc: main lobe, decaying side lobes, zero crossings at every integer x. The kernel behind every resampler.</p>
+    </article>
+
+    <article>
+      <h3>The lettering <span>additive synthesis</span></h3>
+      <math display="block"><msub><mi>x</mi><mtext>text</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><munder><mo>∑</mo><mi>k</mi></munder><msub><mi>m</mi><mi>k</mi></msub><mo>(</mo><mi>t</mi><mo>)</mo><mi>sin</mi><mo>(</mo><mn>2</mn><mi>π</mi><msub><mi>f</mi><mi>k</mi></msub><mi>t</mi><mo>+</mo><msub><mi>φ</mi><mi>k</mi></msub><mo>)</mo><mo>,</mo><mspace width="1em"/><msub><mi>f</mi><mi>k</mi></msub><mo>=</mo><mn>3</mn><mi>k</mi><mo>·</mo><mfrac><msub><mi>f</mi><mi>s</mi></msub><mi>N</mi></mfrac></math>
+      <p>m<sub>k</sub>(t) is row k of the rendered word “LimitlessGreen”. Tones sit on every third FFT bin centre: a Hann window spreads a bin-centred tone over exactly ±1 bin, so neighbours never beat.</p>
+    </article>
+
+    <article>
+      <h3>Room <span>forest reverb</span></h3>
+      <math display="block"><mi>h</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mi>n</mi><mo>(</mo><mi>t</mi><mo>)</mo><mspace width="0.2em"/><msup><mi>e</mi><mrow><mo>−</mo><mi>t</mi><mo>/</mo><mn>70</mn><mtext>&#x2009;ms</mtext></mrow></msup><mo>,</mo><mspace width="1em"/><mi>y</mi><mo>=</mo><mi>x</mi><mo>+</mo><mi>g</mi><mo>·</mo><mo>(</mo><mi>x</mi><mo>*</mo><mi>h</mi><mo>)</mo></math>
+      <p>Exponentially decaying noise as impulse response, applied to everything except the lettering, which stays dry and crisp.</p>
+    </article>
+
+    <article>
+      <h3>The picture <span>short-time Fourier transform</span></h3>
+      <math display="block"><mi>X</mi><mo>[</mo><mi>m</mi><mo>,</mo><mi>k</mi><mo>]</mo><mo>=</mo><munderover><mo>∑</mo><mrow><mi>n</mi><mo>=</mo><mn>0</mn></mrow><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow></munderover><mi>x</mi><mo>[</mo><mi>n</mi><mo>+</mo><mi>m</mi><mi>R</mi><mo>]</mo><mspace width="0.2em"/><mi>w</mi><mo>[</mo><mi>n</mi><mo>]</mo><mspace width="0.2em"/><msup><mi>e</mi><mrow><mo>−</mo><mi>j</mi><mn>2</mn><mi>π</mi><mi>k</mi><mi>n</mi><mo>/</mo><mi>N</mi></mrow></msup><mo>,</mo><mspace width="1em"/><msub><mi>L</mi><mtext>dB</mtext></msub><mo>=</mo><mn>20</mn><msub><mi>log</mi><mn>10</mn></msub><mrow><mo>|</mo><mi>X</mi><mo>|</mo></mrow></math>
+      <p>Hann window w, N = 1024, hop R = 168, f<sub>s</sub> = 24 kHz, 78 dB display range.</p>
+    </article>
+
+    <article>
+      <h3>The beam <span>phosphor persistence</span></h3>
+      <math display="block"><mi>I</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>t</mi><mo>)</mo><mo>=</mo><mi>v</mi><mo>(</mo><mi>x</mi><mo>)</mo><mrow><mo>(</mo><mi>ρ</mi><mo>+</mo><mi>F</mi><mspace width="0.2em"/><msup><mi>e</mi><mrow><mo>−</mo><mo>(</mo><mi>t</mi><mo>−</mo><msub><mi>t</mi><mi>x</mi></msub><mo>)</mo><mo>/</mo><mi>τ</mi></mrow></msup><mo>)</mo></mrow><mspace width="0.8em"/><mtext>for</mtext><mspace width="0.4em"/><mi>t</mi><mo>≥</mo><msub><mi>t</mi><mi>x</mi></msub></math>
+      <p>ρ = 0.52 afterglow (0.66 in light mode), F = 1.25 flare, τ = 0.55 s; t<sub>x</sub> is when the beam passes column x.</p>
+    </article>
+
+    <p class="src">Source: <a href="https://github.com/LimitlessGreen/LimitlessGreen/blob/main/scripts/make_banner.py">make_banner.py</a> · <a href="https://github.com/LimitlessGreen/LimitlessGreen/blob/main/scripts/make_video.py">make_video.py</a></p>
+  </section>
 </main>
 
 <audio id="audio" src="assets/banner.wav" preload="auto"></audio>
