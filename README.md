@@ -7,6 +7,9 @@ I build tools for **listening to nature** — spectrogram viewers, bird call det
 on-device inference — and spend the rest of my time on **live audio for the stage** and
 **FPV / drone hardware**. Based in Dresden, Germany.
 
+<a href="https://github.com/sponsors/LimitlessGreen"><img alt="Sponsor LimitlessGreen on GitHub" src="https://img.shields.io/badge/Sponsor_me-db61a2?style=for-the-badge&logo=githubsponsors&logoColor=white"></a>
+&nbsp;<sub>If my tools save you time, sponsoring helps me keep them maintained.</sub>
+
 ### 🌱 Projects
 
 | | Project | What it is |
