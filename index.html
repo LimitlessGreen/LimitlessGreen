@@ -68,7 +68,7 @@
   const icon = document.getElementById("icon");
   const time = document.getElementById("time");
   const dark = matchMedia("(prefers-color-scheme: dark)");
-  let playhead = null;
+  let playheads = [];
 
   async function loadBanner() {
     const res = await fetch(`assets/banner-${dark.matches ? "dark" : "light"}.svg`);
@@ -77,14 +77,15 @@
     const svg = box.querySelector("svg");
     svg.removeAttribute("width");
     svg.removeAttribute("height");
-    playhead = svg.querySelector(".ph");
-    playhead.style.animation = "none";   // we drive it from the audio clock
+    // beam + phosphor mask: stop the CSS loop, drive them from the audio clock
+    playheads = [...svg.querySelectorAll(".ph")];
+    playheads.forEach((el) => (el.style.animation = "none"));
     draw();
   }
 
   function draw() {
     const t = audio.currentTime || 0;
-    if (playhead) playhead.style.transform = `translateX(${(t / DUR) * W}px)`;
+    playheads.forEach((el) => (el.style.transform = `translateX(${(t / DUR) * W}px)`));
     time.textContent = `${t.toFixed(1)} / ${DUR.toFixed(1)} s`;
     if (!audio.paused) requestAnimationFrame(draw);
   }

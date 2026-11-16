@@ -6,6 +6,14 @@
 </a>
 <p align="right"><sub>🔊 This banner is real audio — <a href="https://limitlessgreen.github.io/LimitlessGreen/">click to listen</a></sub></p>
 
+<details>
+<summary>▶ Play it right here</summary>
+
+<!-- Drag LimitlessGreen-banner-listen.mp4 onto the empty line below in the GitHub web editor -->
+
+
+</details>
+
 I build tools for **listening to nature** — spectrogram viewers, bird call detectors and
 on-device inference — and spend the rest of my time on **live audio for the stage** and
 **FPV / drone hardware**. Based in Dresden, Germany.

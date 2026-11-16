@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import make_banner as mb  # noqa: E402  (regenerates the banner + wav)
@@ -27,10 +27,8 @@ VW, VH = int(mb.W * SCALE), int(mb.H * SCALE)        # 1920 x 480
 FPS = 30
 TAIL = 0.8                                           # let the glow die out
 
-# phosphor model
-RESIDUAL = 0.52      # faint afterglow / not-yet-played level
-FLARE = 1.25         # extra brightness right behind the beam
-TAU = 0.55           # decay time constant in seconds
+# phosphor model: shared with the SVG banner
+RESIDUAL, FLARE, TAU, TAIL = mb.RESIDUAL, mb.FLARE, mb.TAU, mb.TAIL
 BEAM_W = 3           # px (video)
 
 th = mb.THEMES["dark"]
@@ -43,7 +41,7 @@ def overlay_png():
     svg = (mb.OUT / "banner-dark.svg").read_text()
     svg = re.sub(r"<image [^>]*/>", "", svg)
     svg = svg.replace(f'<rect width="{mb.W}" height="{mb.H}" fill="{th["bg"]}"/>', "")
-    svg = svg.replace('<g class="ph">', '<g class="ph" style="display:none">')
+    svg = svg.replace('<g class="ph beam">', '<g class="ph beam" style="display:none">')
     tmp = OUT.with_suffix(".overlay.svg")
     tmp.write_text(svg)
     with sync_playwright() as pw:
@@ -65,7 +63,7 @@ def main():
     v = np.asarray(Image.fromarray((mb.v * 255).astype(np.uint8)).resize(
         (VW, VH), Image.BICUBIC), dtype=float) / 255
     col_t = (np.arange(VW) + 0.5) / VW * mb.DUR          # time of each column
-    beam_col = np.array([200, 255, 170], float)
+    beam_col = np.array(th["beam"], float)
 
     n_frames = int((mb.DUR + TAIL) * FPS)
     ff = subprocess.Popen(
@@ -85,17 +83,12 @@ def main():
         gain = RESIDUAL + np.where(lit, FLARE * np.exp(-np.clip(age, 0, None) / TAU), 0)
         e = v * gain[None, :]                               # excitation
 
-        rgb = th["cmap"](np.clip(e, 0, 1))
-        # over-driven phosphor saturates towards white-green
-        over = np.clip(e - 1, 0, 0.6)[..., None] / 0.6
-        rgb = rgb * (1 - over) + np.array([235, 255, 215]) * over
+        rgb = mb.phosphor(e, th)
 
-        # bloom: blurred copy of the freshly excited part
+        # bloom around the freshly excited part
         fresh = np.where(lit & (age < 3 * TAU), np.exp(-np.clip(age, 0, None) / TAU), 0)
         if fresh.any():
-            glow = Image.fromarray(np.clip(v * fresh[None, :] * 255, 0, 255).astype(np.uint8))
-            glow = np.asarray(glow.filter(ImageFilter.GaussianBlur(6)), float)[..., None] / 255
-            rgb = rgb + glow * np.array([60, 200, 90]) * 0.9
+            rgb = rgb + mb.bloom(v * fresh[None, :], th)
 
         # the beam itself, with a soft halo
         if t <= mb.DUR:

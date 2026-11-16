@@ -3,7 +3,7 @@
 Synthesizes a short "dawn chorus" of bird-like syllables plus the word
 "LimitlessGreen" written into the audio as tones, computes a real
 STFT spectrogram, colors it and embeds it as WebP in an SVG with axes, title
-and an animated playhead.
+and an animated phosphor-screen playhead.
 
     uv run --with numpy --with pillow scripts/make_banner.py
 """
@@ -232,25 +232,60 @@ THEMES = {
         cmap=colormap([(0, "#020806"), (0.3, "#06251a"), (0.5, "#0b5a33"),
                        (0.7, "#1f9a4a"), (0.86, "#7ed957"), (1, "#f2ffc8")]),
         bg="#020806", fg="#f0f6f0", muted="#9fb3a6", accent="#7ed957",
-        grid="#ffffff", grid_op=0.06),
+        grid="#ffffff", grid_op=0.06,
+        over=(235, 255, 215), glow=(60, 200, 90), beam=(200, 255, 170)),
     "light": dict(
         cmap=colormap([(0, "#ffffff"), (0.3, "#eef7ee"), (0.5, "#b5dfb9"),
                        (0.7, "#4fae69"), (0.86, "#17703d"), (1, "#06331c")]),
         bg="#ffffff", fg="#14251a", muted="#4b5e52", accent="#17703d",
-        grid="#000000", grid_op=0.06),
+        grid="#000000", grid_op=0.06,
+        over=(4, 60, 30), glow=(-45, -12, -40), beam=(10, 110, 55), residual=0.66),
 }
+
+# --- phosphor model (shared with make_video.py) ----------------------------
+# Not-yet-swept and long-swept areas glow faintly (RESIDUAL); right behind the
+# beam the screen flares up (RESIDUAL + FLARE, over-driven) and decays back
+# with time constant TAU.
+RESIDUAL, FLARE, TAU = 0.52, 1.25, 0.55
+TAIL = 0.8                      # seconds of decay after the beam has left
+CYCLE = DUR + TAIL
+
+
+def phosphor(e, th):
+    """Colour an excitation map e (>= 0, may exceed 1 = over-driven)."""
+    rgb = th["cmap"](np.clip(e, 0, 1))
+    over = (np.clip(e - 1, 0, 0.6) / 0.6)[..., None]
+    return rgb * (1 - over) + np.array(th["over"], float) * over
+
+
+def bloom(v_img, th, strength=1.0, radius=6):
+    """Additive (dark) / subtractive (light) glow around bright structures."""
+    from PIL import ImageFilter
+    g = Image.fromarray(np.clip(v_img * 255 * strength, 0, 255).astype(np.uint8))
+    g = np.asarray(g.filter(ImageFilter.GaussianBlur(radius)), float)[..., None] / 255
+    return g * np.array(th["glow"], float) * 0.9
 
 
 def img_b64(rgb):
     buf = io.BytesIO()
-    Image.fromarray(rgb.astype(np.uint8)).save(buf, "WEBP", quality=82, method=6)
+    Image.fromarray(rgb.astype(np.uint8)).save(buf, "WEBP", quality=74, method=6)
     return base64.b64encode(buf.getvalue()).decode()
 
 
 def build(name, th):
-    # full-bleed spectrogram; the title gets a soft scrim in the SVG instead
-    rgb = th["cmap"](v)
-    img = img_b64(rgb)
+    # two layers: faint afterglow + fully flared; a mask that travels with
+    # the beam blends between them.  At constant beam speed the exponential
+    # decay in time is an exponential ramp in space.
+    res = th.get("residual", RESIDUAL)
+    dim = img_b64(phosphor(v * res, th))
+    bright = img_b64(np.clip(phosphor(v * (res + FLARE), th)
+                             + bloom(v, th, radius=4), 0, 255))
+    speed = W / DUR                                   # px per second
+    trail = 4 * speed * TAU                           # mask length in px
+    trail_stops = "".join(
+        f'<stop offset="{o:.3f}" stop-color="#fff" stop-opacity="{np.exp(-(1 - o) * trail / (speed * TAU)):.3f}"/>'
+        for o in np.linspace(0, 1, 9))
+    end_x = W * CYCLE / DUR
 
     khz_lines = "".join(
         f'<line x1="0" x2="{W}" y1="{H - k / 12 * H:.1f}" y2="{H - k / 12 * H:.1f}"/>'
@@ -270,9 +305,11 @@ def build(name, th):
   <style>
     .t {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }}
     .m {{ font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }}
-    .ph {{ animation: sweep 9s linear infinite; }}
-    @keyframes sweep {{ from {{ transform: translateX({W * 0.30:.0f}px); }} to {{ transform: translateX({W}px); }} }}
-    @media (prefers-reduced-motion: reduce) {{ .ph {{ animation: none; opacity: 0; }} }}
+    .ph {{ animation: sweep {CYCLE}s linear infinite; }}
+    @keyframes sweep {{ from {{ transform: translateX(0px); }} to {{ transform: translateX({end_x:.1f}px); }} }}
+    @media (prefers-reduced-motion: reduce) {{
+      .ph {{ animation: none; }} .beam {{ display: none; }} .flare {{ mask: none; opacity: 0.35; }}
+    }}
   </style>
   <defs>
     <clipPath id="r"><rect width="{W}" height="{H}" rx="12"/></clipPath>
@@ -281,22 +318,28 @@ def build(name, th):
       <stop offset="0.65" stop-color="{th['bg']}" stop-opacity="0.6"/>
       <stop offset="1" stop-color="{th['bg']}" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="g" x1="0" x2="1">
-      <stop offset="0" stop-color="{th['accent']}" stop-opacity="0"/>
-      <stop offset="1" stop-color="{th['accent']}" stop-opacity="0.35"/>
+    <linearGradient id="trail" x1="0" x2="1">{trail_stops}</linearGradient>
+    <linearGradient id="halo" x1="0" x2="1">
+      <stop offset="0" stop-color="rgb{th['beam']}" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="rgb{th['beam']}" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="rgb{th['beam']}" stop-opacity="0"/>
     </linearGradient>
+    <mask id="sweep" maskUnits="userSpaceOnUse" x="0" y="0" width="{W}" height="{H}">
+      <rect class="ph" x="{-trail:.1f}" width="{trail:.1f}" height="{H}" fill="url(#trail)"/>
+    </mask>
   </defs>
   <g clip-path="url(#r)">
     <rect width="{W}" height="{H}" fill="{th['bg']}"/>
-    <image width="{W}" height="{H}" preserveAspectRatio="none" href="data:image/webp;base64,{img}"/>
+    <image width="{W}" height="{H}" preserveAspectRatio="none" href="data:image/webp;base64,{dim}"/>
+    <image class="flare" width="{W}" height="{H}" preserveAspectRatio="none" mask="url(#sweep)" href="data:image/webp;base64,{bright}"/>
     <rect width="{W * 0.42:.0f}" height="{H}" fill="url(#scrim)"/>
     <g stroke="{th['grid']}" stroke-opacity="{th['grid_op']}" stroke-width="1">{khz_lines}</g>
     <g class="m" font-size="11" fill="{th['muted']}" stroke="{th['muted']}" fill-opacity="0.8">{sec_ticks}</g>
     <g class="m" font-size="12" fill="{th['muted']}" fill-opacity="0.8">{khz_labels}</g>
     <g class="m" font-size="11" fill="{th['fg']}" fill-opacity="0.9" stroke="{th['bg']}" stroke-width="3" stroke-opacity="0.7" paint-order="stroke" stroke-linejoin="round">{fn_labels}</g>
-    <g class="ph">
-      <rect x="-60" width="60" height="{H}" fill="url(#g)"/>
-      <rect x="-1" width="2" height="{H}" fill="{th['accent']}"/>
+    <g class="ph beam">
+      <rect x="-14" width="28" height="{H}" fill="url(#halo)"/>
+      <rect x="-1" width="2" height="{H}" fill="rgb{th['beam']}"/>
     </g>
   </g>
   <g class="t">
