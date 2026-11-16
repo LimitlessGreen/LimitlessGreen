@@ -95,36 +95,78 @@ def write_text():
 H_SOFT = (1.0, 0.05)
 
 # 1) descending whistles, repeated
-for k, st in enumerate(np.arange(3.7, 4.75, 0.26)):
+for k, st in enumerate(np.arange(3.55, 4.4, 0.26)):
     hi = 4300 - 200 * (k % 2) + RNG.normal(0, 100)
     st += RNG.normal(0, 0.02)
     add(st, lambda u, hi=hi: hi - 2000 * u ** 0.8, 0.12 + RNG.normal(0, 0.01),
         0.9 * RNG.uniform(0.7, 1.0), harmonics=H_SOFT)
 
-# 2) fast trill
-for k, st in enumerate(np.arange(4.85, 5.85, 0.055)):
-    lo = 2900 - 400 * k / 18
-    add(st, lambda u, lo=lo: lo + 1100 * np.sin(np.pi * u), 0.04,
-        0.55 * (0.4 + 0.6 * np.sin(np.pi * k / 18)), harmonics=H_SOFT)
+# --- signal-processing "specimens" between the birds ----------------------
+# Each one is synthesized for real; LABELS puts its formula underneath.
+LABELS = []
 
-# 3) warbling FM phrase
-add(6.05, lambda u: 2500 + 600 * np.sin(2 * np.pi * 8 * u) + 900 * u, 0.85, 0.8,
-    harmonics=H_SOFT)
 
-# 4) up-slurred "whee-oo" calls
-for st in (7.15, 7.75, 8.35):
+def sub(x):
+    """SVG subscript (tspan shifted down, then back up)."""
+    return f"<tspan dy='3' font-size='8'>{x}</tspan><tspan dy='-3'></tspan>"
+
+
+def sup(x):
+    """SVG superscript."""
+    return f"<tspan dy='-5' font-size='8'>{x}</tspan><tspan dy='5'></tspan>"
+
+
+def place(start, x, amp, fade=0.03):
+    """Mix x into the signal at `start` with short raised-cosine fades."""
+    n = len(x)
+    nf = int(fade * SR)
+    env = np.ones(n)
+    ramp = 0.5 - 0.5 * np.cos(np.linspace(0, np.pi, nf))
+    env[:nf], env[-nf:] = ramp, ramp[::-1]
+    i0 = int(start * SR)
+    signal[i0:i0 + n] += amp * env * x / np.abs(x).max()
+
+
+# 2) exponential sine sweep (Farina) -- the standard excitation for measuring
+#    room impulse responses: x(t) = sin(2 pi f1 L (e^(t/L) - 1)), L = T / ln(f2/f1)
+f1, f2, T = 600, 4400, 0.85
+L = T / np.log(f2 / f1)
+t = np.arange(int(T * SR)) / SR
+place(4.5, np.sin(2 * np.pi * f1 * L * (np.exp(t / L) - 1)), 0.7)
+LABELS.append((4.5 + T / 2, f"sin(2\u03c0f{sub('1')}L(e{sup('t/L')}\u22121))"))
+
+# 3) FM synthesis (Chowning): y = sin(wc t + beta sin(wm t)); sidebands at
+#    fc +- n fm with amplitudes J_n(beta) -- beta swells 0 -> 5 -> 0
+fc, fm, T = 2900, 190, 0.95
+t = np.arange(int(T * SR)) / SR
+beta = 5.5 * np.sin(np.pi * t / T) ** 2
+place(5.5, np.sin(2 * np.pi * fc * t + beta * np.sin(2 * np.pi * fm * t)), 0.75)
+LABELS.append((5.5 + T / 2, f"sin(\u03c9{sub('c')}t + \u03b2 sin \u03c9{sub('m')}t)"))
+
+# 4) Fourier series of a sawtooth: sum_n sin(n w0 t) / n, band-limited to
+#    ~4.6 kHz, with a glide + vibrato so the harmonics fan out as curves
+T = 0.9
+t = np.arange(int(T * SR)) / SR
+f0 = 380 + 160 * (t / T) + 14 * np.sin(2 * np.pi * 5.5 * t) * (t / T)
+ph = 2 * np.pi * np.cumsum(f0) / SR
+saw = sum(np.sin(n * ph) / n * (n * f0 < 4600) for n in range(2, 13))
+place(6.6, saw, 0.8)
+LABELS.append((6.6 + T / 2, f"\u03a3 sin(n\u03c9{sub('0')}t)/n"))
+
+# 5) up-slurred "whee-oo" calls
+for st in (7.65, 8.2):
     add(st, lambda u: 1700 + 2300 * np.sin(np.pi * u) ** 2, 0.4, 0.9,
         harmonics=H_SOFT)
 
-# 5) a few soft, low calls drifting into the title area (very faint)
+# 6) a few soft, low calls drifting into the title area (very faint)
 for st, f0 in ((0.6, 2200), (1.5, 2600), (2.4, 2400)):
     add(st, lambda u, f0=f0: f0 + 700 * u, 0.25, 0.12)
 
-# 6) high, thin "seee" notes above the text
+# 7) high, thin "seee" notes above the text
 for st in (3.4, 6.2):
     add(st, lambda u: 11000 - 300 * u, 0.45, 0.15, harmonics=(1.0,))
 
-# 7) distant birds: many faint syllables everywhere -> a real dawn chorus
+# 8) distant birds: many faint syllables everywhere -> a real dawn chorus
 for _ in range(70):
     st = RNG.uniform(0, DUR - 0.3)
     f0 = RNG.uniform(1500, 8500)
@@ -209,11 +251,14 @@ def build(name, th):
         f'<line x1="{s / DUR * W:.1f}" x2="{s / DUR * W:.1f}" y1="0" y2="6"/>'
         f'<text x="{s / DUR * W + 4:.1f}" y="15" stroke="none">{s} s</text>'
         for s in range(5, int(DUR) + 1))
+    fn_labels = "".join(
+        f'<text x="{t / DUR * W:.1f}" y="{H - 9}" text-anchor="middle">{txt}</text>'
+        for t, txt in LABELS)
     khz_labels = "".join(
         f'<text x="{W - 10}" y="{H - k / 12 * H - 4:.1f}" text-anchor="end">{k} kHz</text>'
         for k in (2, 4, 6, 8, 10))
 
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Jairus: bioacoustics, audio tools and FPV. Spectrogram of bird calls with the word LimitlessGreen written into the sound.">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Jairus: bioacoustics, audio tools and FPV. Spectrogram of bird calls, a sine sweep, FM synthesis and a Fourier series, with the word LimitlessGreen written into the sound.">
   <style>
     .t {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }}
     .m {{ font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }}
@@ -240,6 +285,7 @@ def build(name, th):
     <g stroke="{th['grid']}" stroke-opacity="{th['grid_op']}" stroke-width="1">{khz_lines}</g>
     <g class="m" font-size="11" fill="{th['muted']}" stroke="{th['muted']}" fill-opacity="0.8">{sec_ticks}</g>
     <g class="m" font-size="12" fill="{th['muted']}" fill-opacity="0.8">{khz_labels}</g>
+    <g class="m" font-size="11" fill="{th['fg']}" fill-opacity="0.9" stroke="{th['bg']}" stroke-width="3" stroke-opacity="0.7" paint-order="stroke" stroke-linejoin="round">{fn_labels}</g>
     <g class="ph">
       <rect x="-60" width="60" height="{H}" fill="url(#g)"/>
       <rect x="-1" width="2" height="{H}" fill="{th['accent']}"/>
