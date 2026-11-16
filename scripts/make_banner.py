@@ -107,13 +107,16 @@ LABELS = []
 
 
 def sub(x):
-    """SVG subscript (tspan shifted down, then back up)."""
-    return f"<tspan dy='3' font-size='8'>{x}</tspan><tspan dy='-3'></tspan>"
+    """SVG subscript (tspan shifted down, then back up).
+
+    The zero-width space carries the return shift -- browsers ignore an
+    empty tspan, which would leave the rest of the formula lowered."""
+    return f"<tspan dy='3' font-size='8'>{x}</tspan><tspan dy='-3'>\u200b</tspan>"
 
 
 def sup(x):
     """SVG superscript."""
-    return f"<tspan dy='-5' font-size='8'>{x}</tspan><tspan dy='5'></tspan>"
+    return f"<tspan dy='-5' font-size='8'>{x}</tspan><tspan dy='5'>\u200b</tspan>"
 
 
 def place(start, x, amp, fade=0.03):
@@ -257,7 +260,7 @@ def build(name, th):
         f'<text x="{s / DUR * W + 4:.1f}" y="15" stroke="none">{s} s</text>'
         for s in range(5, int(DUR) + 1))
     fn_labels = "".join(
-        f'<text x="{t / DUR * W:.1f}" y="{H - 9}" text-anchor="middle">{txt}</text>'
+        f'<text x="{t / DUR * W:.1f}" y="{H - 13}" text-anchor="middle">{txt}</text>'
         for t, txt in LABELS)
     khz_labels = "".join(
         f'<text x="{W - 10}" y="{H - k / 12 * H - 4:.1f}" text-anchor="end">{k} kHz</text>'
