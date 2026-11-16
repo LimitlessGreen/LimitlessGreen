@@ -1,7 +1,10 @@
+<a href="https://limitlessgreen.github.io/LimitlessGreen/" title="Click to listen to this spectrogram">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
-  <img alt="Jairus — bioacoustics, audio tools and FPV" src="assets/banner-light.svg" width="100%">
+  <img alt="Jairus — bioacoustics, audio tools and FPV. Click to listen to the banner." src="assets/banner-light.svg" width="100%">
 </picture>
+</a>
+<p align="right"><sub>🔊 This banner is real audio — <a href="https://limitlessgreen.github.io/LimitlessGreen/">click to listen</a></sub></p>
 
 I build tools for **listening to nature** — spectrogram viewers, bird call detectors and
 on-device inference — and spend the rest of my time on **live audio for the stage** and

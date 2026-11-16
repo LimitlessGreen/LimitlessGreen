@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Listen to the banner · LimitlessGreen</title>
+  <meta name="description" content="The spectrogram banner from my GitHub profile is real audio. Press play.">
+  <style>
+    :root { color-scheme: light dark; --bg: #ffffff; --fg: #14251a; --muted: #4b5e52; --accent: #17703d; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #020806; --fg: #f0f6f0; --muted: #9fb3a6; --accent: #7ed957; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: var(--bg); color: var(--fg);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    }
+    main { width: min(1280px, 100% - 32px); }
+    #banner svg { display: block; width: 100%; height: auto; }
+    .bar { display: flex; align-items: center; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+    button {
+      appearance: none; border: 0; cursor: pointer; border-radius: 999px;
+      width: 56px; height: 56px; display: grid; place-items: center;
+      background: var(--accent); color: var(--bg);
+    }
+    button:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px; }
+    button svg { width: 24px; height: 24px; fill: currentColor; }
+    .time { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); min-width: 9ch; }
+    p { color: var(--muted); margin: 0; flex: 1 1 320px; }
+    a { color: var(--accent); }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; margin: 28px 0 0; color: var(--muted); font-size: 14px; }
+    dt { color: var(--fg); font-weight: 600; }
+    dd { margin: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <div id="banner" aria-live="off"></div>
+
+  <div class="bar">
+    <button id="play" aria-label="Play">
+      <svg id="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <span class="time" id="time">0.0 / 9.0 s</span>
+    <p>Everything in this spectrogram is real audio — the birds, the formulas and the lettering.
+       Best with headphones; the letters sound a bit like a choir of sine waves.
+       <a href="https://github.com/LimitlessGreen">← back to GitHub</a></p>
+  </div>
+
+  <dl>
+    <dt>Birds</dt><dd>Synthetic syllables with pitch jitter, a few dozen distant calls and a short forest reverb.</dd>
+    <dt>Sweep</dt><dd>Exponential sine sweep (Farina), the classic excitation for measuring room impulse responses.</dd>
+    <dt>FM</dt><dd>Chowning FM synthesis; the sidebands at f<sub>c</sub> ± n·f<sub>m</sub> follow Bessel functions J<sub>n</sub>(β).</dd>
+    <dt>Σ</dt><dd>Fourier series of a band-limited sawtooth with glide and vibrato.</dd>
+    <dt>sinc</dt><dd>A tone tracing sin(πx)/(πx), the impulse response of the ideal low-pass.</dd>
+    <dt>Text</dt><dd>One sine per third FFT bin, its loudness following the rendered letters.
+      Source: <a href="https://github.com/LimitlessGreen/LimitlessGreen/blob/main/scripts/make_banner.py">make_banner.py</a></dd>
+  </dl>
+</main>
+
+<audio id="audio" src="assets/banner.wav" preload="auto"></audio>
+
+<script>
+  const DUR = 9, W = 1280;
+  const audio = document.getElementById("audio");
+  const btn = document.getElementById("play");
+  const icon = document.getElementById("icon");
+  const time = document.getElementById("time");
+  const dark = matchMedia("(prefers-color-scheme: dark)");
+  let playhead = null;
+
+  async function loadBanner() {
+    const res = await fetch(`assets/banner-${dark.matches ? "dark" : "light"}.svg`);
+    const box = document.getElementById("banner");
+    box.innerHTML = await res.text();
+    const svg = box.querySelector("svg");
+    svg.removeAttribute("width");
+    svg.removeAttribute("height");
+    playhead = svg.querySelector(".ph");
+    playhead.style.animation = "none";   // we drive it from the audio clock
+    draw();
+  }
+
+  function draw() {
+    const t = audio.currentTime || 0;
+    if (playhead) playhead.style.transform = `translateX(${(t / DUR) * W}px)`;
+    time.textContent = `${t.toFixed(1)} / ${DUR.toFixed(1)} s`;
+    if (!audio.paused) requestAnimationFrame(draw);
+  }
+
+  function setIcon(playing) {
+    icon.innerHTML = playing ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+    btn.setAttribute("aria-label", playing ? "Pause" : "Play");
+  }
+
+  btn.addEventListener("click", () => (audio.paused ? audio.play() : audio.pause()));
+  audio.addEventListener("play", () => { setIcon(true); draw(); });
+  audio.addEventListener("pause", () => setIcon(false));
+  audio.addEventListener("seeked", draw);
+  audio.addEventListener("ended", () => { audio.currentTime = 0; setIcon(false); draw(); });
+
+  // click on the spectrogram to seek
+  document.getElementById("banner").addEventListener("click", (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    audio.currentTime = ((e.clientX - r.left) / r.width) * DUR;
+    draw();
+  });
+
+  dark.addEventListener("change", loadBanner);
+  loadBanner();
+</script>
+</body>
+</html>

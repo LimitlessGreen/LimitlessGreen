@@ -316,3 +316,17 @@ def build(name, th):
 OUT.mkdir(exist_ok=True)
 for name, th in THEMES.items():
     build(name, th)
+
+# --- the audio itself, for the "listen" page -----------------------------
+import wave  # noqa: E402
+
+pcm = signal / np.abs(signal).max() * 0.89          # ~ -1 dBFS
+fade = int(0.02 * SR)
+pcm[:fade] *= np.linspace(0, 1, fade)
+pcm[-fade:] *= np.linspace(1, 0, fade)
+with wave.open(str(OUT / "banner.wav"), "wb") as wf:
+    wf.setnchannels(1)
+    wf.setsampwidth(2)
+    wf.setframerate(SR)
+    wf.writeframes((pcm * 32767).astype("<i2").tobytes())
+print(f"banner.wav: {(OUT / 'banner.wav').stat().st_size / 1024:.0f} kB")
