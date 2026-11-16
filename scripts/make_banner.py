@@ -153,10 +153,15 @@ saw = sum(np.sin(n * ph) / n * (n * f0 < 4600) for n in range(2, 13))
 place(6.6, saw, 0.8)
 LABELS.append((6.6 + T / 2, f"\u03a3 sin(n\u03c9{sub('0')}t)/n"))
 
-# 5) up-slurred "whee-oo" calls
-for st in (7.65, 8.2):
-    add(st, lambda u: 1700 + 2300 * np.sin(np.pi * u) ** 2, 0.4, 0.9,
-        harmonics=H_SOFT)
+# 5) sinc(x) = sin(pi x) / (pi x) -- impulse response of the ideal low-pass,
+#    the kernel behind every resampler.  A tone traces its shape: main lobe
+#    plus decaying side lobes (zero crossings at every integer x).
+T = 1.15
+t = np.arange(int(T * SR)) / SR
+x = np.linspace(-6.5, 6.5, len(t))
+f_sinc = 1900 + 2500 * np.sinc(x)               # numpy's sinc is normalized
+place(7.5, np.sin(2 * np.pi * np.cumsum(f_sinc) / SR), 0.85)
+LABELS.append((7.5 + T / 2, "sin(\u03c0x)/(\u03c0x)"))
 
 # 6) a few soft, low calls drifting into the title area (very faint)
 for st, f0 in ((0.6, 2200), (1.5, 2600), (2.4, 2400)):
@@ -258,7 +263,7 @@ def build(name, th):
         f'<text x="{W - 10}" y="{H - k / 12 * H - 4:.1f}" text-anchor="end">{k} kHz</text>'
         for k in (2, 4, 6, 8, 10))
 
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Jairus: bioacoustics, audio tools and FPV. Spectrogram of bird calls, a sine sweep, FM synthesis and a Fourier series, with the word LimitlessGreen written into the sound.">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Jairus: bioacoustics, audio tools and FPV. Spectrogram of bird calls, a sine sweep, FM synthesis, a Fourier series and a sinc function, with the word LimitlessGreen written into the sound.">
   <style>
     .t {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }}
     .m {{ font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }}
