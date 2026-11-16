@@ -1,6 +1,7 @@
 """Generate the spectrogram profile banner (light + dark SVG).
 
-Synthesizes a short "dawn chorus" of bird-like syllables, computes a real
+Synthesizes a short "dawn chorus" of bird-like syllables plus the word
+"LimitlessGreen" written into the audio as tones, computes a real
 STFT spectrogram, colors it and embeds it as WebP in an SVG with axes, title
 and an animated playhead.
 
@@ -41,38 +42,86 @@ def add(start, f_of_t, dur, amp=1.0, harmonics=(1.0, 0.25, 0.08)):
     signal[i0:i0 + n] += amp * env * s
 
 
-# --- the "chorus" ---------------------------------------------------------
-# Left third stays quiet-ish so the title is readable.
+# --- spectrogram text -----------------------------------------------------
+# "LimitlessGreen" is written *into the sound*: the text is rendered as a
+# bitmap (rows = frequencies, columns = time) and every row becomes a sine
+# tone whose loudness follows the pixels.  The STFT below then reveals it.
 
-# 1) descending whistles (like a chiffchaff / tit), repeated
-for k, st in enumerate(np.arange(3.2, 5.0, 0.32)):
-    hi = 7200 - 250 * (k % 2) + RNG.normal(0, 120)
+TEXT = "LimitlessGreen"
+TEXT_T = (3.45, 8.55)        # seconds
+TEXT_F = (5000, 9700)        # Hz
+FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+
+def write_text():
+    from PIL import ImageDraw, ImageFilter, ImageFont
+
+    try:
+        font = ImageFont.truetype(FONT, 200)
+    except OSError:
+        font = ImageFont.load_default(200)
+    x0, y0, x1, y1 = font.getbbox(TEXT)
+    mask = Image.new("L", (x1 - x0 + 20, y1 - y0 + 20))
+    ImageDraw.Draw(mask).text((10 - x0, 10 - y0), TEXT, font=font, fill=255)
+
+    # one tone on every 3rd STFT bin centre: a Hann window spreads a
+    # bin-centred tone over exactly its own bin +-1, so every bin is fed by
+    # a single tone -> no beating between neighbours, clean letters
+    bin_hz = SR / 1024
+    freqs = np.arange(np.ceil(TEXT_F[0] / bin_hz / 3) * 3,
+                      TEXT_F[1] / bin_hz, 3) * bin_hz
+    n_rows = len(freqs)
+    n_cols = int((TEXT_T[1] - TEXT_T[0]) * 400)         # 2.5 ms envelope steps
+    mask = mask.resize((n_cols, n_rows), Image.LANCZOS).filter(
+        ImageFilter.GaussianBlur(0.8))
+    m = np.flipud(np.asarray(mask, dtype=float) / 255)  # row 0 = lowest freq
+
+    i0, i1 = int(TEXT_T[0] * SR), int(TEXT_T[1] * SR)
+    t = t_all[i0:i1]
+    cols = np.linspace(0, n_cols - 1, len(t))
+    for j, f in enumerate(freqs):
+        if m[j].max() < 0.05:
+            continue
+        env = np.interp(cols, np.arange(n_cols), m[j])
+        signal[i0:i1] += 0.2 * env * np.sin(2 * np.pi * f * t + RNG.uniform(0, 2 * np.pi))
+
+
+write_text()
+
+# --- the "chorus" (below the text) ----------------------------------------
+# Left third stays quiet-ish so the title is readable.  Harmonics are kept
+# weak so they don't scribble over the lettering.
+H_SOFT = (1.0, 0.05)
+
+# 1) descending whistles, repeated
+for k, st in enumerate(np.arange(3.7, 4.75, 0.26)):
+    hi = 4300 - 200 * (k % 2) + RNG.normal(0, 100)
     st += RNG.normal(0, 0.02)
-    add(st, lambda u, hi=hi: hi - 3200 * u ** 0.8, 0.12 + RNG.normal(0, 0.01),
-        0.9 * RNG.uniform(0.7, 1.0))
+    add(st, lambda u, hi=hi: hi - 2000 * u ** 0.8, 0.12 + RNG.normal(0, 0.01),
+        0.9 * RNG.uniform(0.7, 1.0), harmonics=H_SOFT)
 
 # 2) fast trill
-for k, st in enumerate(np.arange(5.3, 6.4, 0.055)):
-    lo = 5200 - 600 * k / 20
-    add(st, lambda u, lo=lo: lo + 1800 * np.sin(np.pi * u), 0.04,
-        0.55 * (0.4 + 0.6 * np.sin(np.pi * k / 20)), harmonics=(1.0, 0.1))
+for k, st in enumerate(np.arange(4.85, 5.85, 0.055)):
+    lo = 2900 - 400 * k / 18
+    add(st, lambda u, lo=lo: lo + 1100 * np.sin(np.pi * u), 0.04,
+        0.55 * (0.4 + 0.6 * np.sin(np.pi * k / 18)), harmonics=H_SOFT)
 
 # 3) warbling FM phrase
-add(6.6, lambda u: 3600 + 900 * np.sin(2 * np.pi * 9 * u) + 1500 * u, 0.9, 0.8,
-    harmonics=(1.0, 0.35, 0.12))
+add(6.05, lambda u: 2500 + 600 * np.sin(2 * np.pi * 8 * u) + 900 * u, 0.85, 0.8,
+    harmonics=H_SOFT)
 
 # 4) up-slurred "whee-oo" calls
-for st in (7.7, 8.25):
-    add(st, lambda u: 2600 + 3400 * np.sin(np.pi * u) ** 2, 0.42, 0.9,
-        harmonics=(1.0, 0.18))
+for st in (7.15, 7.75, 8.35):
+    add(st, lambda u: 1700 + 2300 * np.sin(np.pi * u) ** 2, 0.4, 0.9,
+        harmonics=H_SOFT)
 
 # 5) a few soft, low calls drifting into the title area (very faint)
 for st, f0 in ((0.6, 2200), (1.5, 2600), (2.4, 2400)):
     add(st, lambda u, f0=f0: f0 + 700 * u, 0.25, 0.12)
 
-# 6) high, thin "seee" notes in the background
-for st in (3.9, 6.0, 8.0):
-    add(st, lambda u: 9800 - 400 * u, 0.5, 0.18, harmonics=(1.0,))
+# 6) high, thin "seee" notes above the text
+for st in (3.4, 6.2):
+    add(st, lambda u: 11000 - 300 * u, 0.45, 0.15, harmonics=(1.0,))
 
 # background noise: pink-ish, stronger at low frequencies (wind / distance)
 noise = RNG.normal(size=len(signal))
@@ -126,7 +175,7 @@ def img_b64(rgb):
 def build(name, th):
     # fade the spectrogram out under the title on the left
     x = np.linspace(0, 1, IMG_W)
-    fade = np.clip((x - 0.12) / 0.3, 0, 1) ** 1.2
+    fade = np.clip((x - 0.10) / 0.24, 0, 1) ** 1.2
     rgb = th["cmap"](v * (0.15 + 0.85 * fade)[None, :])
     img = img_b64(rgb)
 
@@ -137,7 +186,7 @@ def build(name, th):
         f'<text x="{W - 10}" y="{H - k / 12 * H - 4:.1f}" text-anchor="end">{k} kHz</text>'
         for k in (2, 4, 6, 8, 10))
 
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Jairus — LimitlessGreen: bioacoustics, audio tools and FPV">
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="Jairus: bioacoustics, audio tools and FPV. Spectrogram of bird calls with the word LimitlessGreen written into the sound.">
   <style>
     .t {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }}
     .m {{ font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }}
@@ -166,7 +215,7 @@ def build(name, th):
     <text x="56" y="150" font-size="64" font-weight="700" fill="{th['fg']}" letter-spacing="-1">Jairus</text>
     <text x="58" y="190" font-size="22" fill="{th['muted']}">Bioacoustics · Audio tools · FPV</text>
   </g>
-  <g class="m" font-size="17" fill="{th['accent']}">
+  <g class="m" font-size="15" fill="{th['accent']}">
     <text x="58" y="250">$ listen --to nature --and build tools for it</text>
   </g>
 </svg>

@@ -31,4 +31,4 @@ on-device inference — and spend the rest of my time on **live audio for the st
   <img alt="TypeScript, Python, Rust, Dart, Flutter, C++, Kotlin, Linux" src="https://skillicons.dev/icons?i=ts,py,rust,dart,flutter,cpp,kotlin,linux&perline=8" height="40">
 </p>
 
-<sub>Banner: a synthetic dawn chorus rendered as a real spectrogram — see <a href="scripts/make_banner.py"><code>scripts/make_banner.py</code></a>.</sub>
+<sub>Banner: a synthetic dawn chorus with “LimitlessGreen” written into the audio, rendered as a real spectrogram — see <a href="scripts/make_banner.py"><code>scripts/make_banner.py</code></a>.</sub>
